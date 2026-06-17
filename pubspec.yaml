@@ -38,6 +38,8 @@ dependencies:
   supabase_flutter: ^2.14.2
   file_picker: ^11.0.2
   http: ^1.6.0
+  google_fonts: ^6.3.2
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
