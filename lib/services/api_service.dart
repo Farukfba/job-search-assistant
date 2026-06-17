@@ -59,27 +59,66 @@ class ApiService {
   }
 
   static Future<String> coverLetter(
-      Map<String, dynamic> cvData, String jobDescription) async {
-    final uri = Uri.parse('$baseUrl/api/public/cover-letter');
-    final response = await http.post(uri,
-        headers: _headers,
-        body: jsonEncode({'cv_data': cvData, 'job_description': jobDescription}));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body)['cover_letter'] ?? response.body;
-    }
-    throw Exception('Failed to generate cover letter: ${response.body}');
+    Map<String, dynamic> cvData, String jobDescription) async {
+  final uri = Uri.parse('$baseUrl/api/public/cover-letter');
+  final response = await http.post(uri,
+      headers: _headers,
+      body: jsonEncode({'cv_data': cvData, 'job_description': jobDescription}));
+  if (response.statusCode == 200) {
+    return response.body; // plain text, not JSON
   }
+  throw Exception('Failed to generate cover letter: ${response.body}');
+}
 
-  static Future<List<dynamic>> interviewPrep(
-      Map<String, dynamic> cvData, String jobDescription) async {
-    final uri = Uri.parse('$baseUrl/api/public/interview-prep');
-    final response = await http.post(uri,
-        headers: _headers,
-        body: jsonEncode({'cv_data': cvData, 'job_description': jobDescription}));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['questions'] ?? [];
-    }
-    throw Exception('Failed to generate interview prep: ${response.body}');
+  static Future<String> interviewPrep(
+    Map<String, dynamic> cvData, String jobDescription) async {
+  final uri = Uri.parse('$baseUrl/api/public/interview-prep');
+  final response = await http.post(uri,
+      headers: _headers,
+      body: jsonEncode({'cv_data': cvData, 'job_description': jobDescription}));
+  if (response.statusCode == 200) {
+    return response.body;
   }
+  throw Exception('Failed to generate interview prep: ${response.body}');
+}
+  static Future<void> saveJob({
+  required String jobTitle,
+  required String company,
+  required String jobUrl,
+  required int matchScore,
+  required String status,
+}) async {
+  final uri = Uri.parse('$baseUrl/api/public/save-job');
+  final response = await http.post(uri,
+      headers: _headers,
+      body: jsonEncode({
+        'job_title': jobTitle,
+        'company': company,
+        'job_url': jobUrl,
+        'match_score': matchScore,
+        'status': status,
+      }));
+  if (response.statusCode != 200) {
+    throw Exception('Failed to save job: ${response.body}');
+  }
+}
+
+static Future<List<Map<String, dynamic>>> getSavedJobs() async {
+  final response = await Supabase.instance.client
+      .from('saved_jobs')
+      .select()
+      .order('created_at', ascending: false);
+  return List<Map<String, dynamic>>.from(response);
+}
+
+static Future<void> updateJobStatus(String id, String status) async {
+  final uri = Uri.parse('$baseUrl/api/public/update-job-status');
+  final response = await http.post(uri,
+      headers: _headers,
+      body: jsonEncode({'id': id, 'status': status}));
+  if (response.statusCode != 200) {
+    throw Exception('Failed to update status: ${response.body}');
+  }
+}
+
 }

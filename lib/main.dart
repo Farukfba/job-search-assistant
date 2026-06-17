@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/auth_screen.dart';
 import 'screens/cv_upload_screen.dart';
+import 'screens/main_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,8 +46,8 @@ class _AuthGateState extends State<AuthGate> {
       builder: (context, snapshot) {
         final session = supabase.auth.currentSession;
         if (session != null) {
-          // Logged in — for now, always go to CV upload.
-          // Step 3 will add a check for whether a profile already exists.
+          // Logged in — CvUploadScreen itself checks for an existing
+          // profile and redirects straight to MainShell if one exists.
           return const CvUploadScreen();
         }
         return const AuthScreen();

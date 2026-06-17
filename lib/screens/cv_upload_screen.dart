@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/api_service.dart';
 import '../main.dart';
-import 'job_search_screen.dart';
+import 'main_shell.dart';
 
 class CvUploadScreen extends StatefulWidget {
   const CvUploadScreen({super.key});
@@ -24,7 +24,7 @@ class _CvUploadScreenState extends State<CvUploadScreen> {
     _checkExistingProfile();
   }
 
-  // If the user already has a profile, skip straight to job search
+  // If the user already has a profile, skip straight to the main app shell
   Future<void> _checkExistingProfile() async {
     try {
       final userId = supabase.auth.currentUser!.id;
@@ -35,7 +35,7 @@ class _CvUploadScreenState extends State<CvUploadScreen> {
           .maybeSingle();
       if (data != null && mounted) {
         Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const JobSearchScreen()));
+            MaterialPageRoute(builder: (_) => const MainShell()));
       }
     } catch (_) {
       // No profile yet — show upload screen
@@ -45,29 +45,30 @@ class _CvUploadScreenState extends State<CvUploadScreen> {
   }
 
   Future<void> _pickAndUpload() async {
-  FilePickerResult? result = await FilePicker.pickFiles(
-    type: FileType.custom,
-    allowedExtensions: ['pdf'],
-    withData: true,
-  );
-  if (result == null || result.files.single.bytes == null) return;
+    FilePickerResult? result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+    if (result == null || result.files.single.bytes == null) return;
 
-  setState(() {
-    _isLoading = true;
-    _error = null;
-  });
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-  try {
-    final file = result.files.single;
-    final parsed = await ApiService.parseCv(file.bytes!, file.name);
-    setState(() => _extractedData = parsed);
-  } catch (e) {
-  print('CV parse error: $e');
-  setState(() => _error = 'Failed to parse CV: $e');
-} finally {
-    setState(() => _isLoading = false);
+    try {
+      final file = result.files.single;
+      final parsed = await ApiService.parseCv(file.bytes!, file.name);
+      print('Full parsed response: $parsed');
+      setState(() => _extractedData = parsed);
+    } catch (e) {
+      print('CV parse error: $e');
+      setState(() => _error = 'Failed to parse CV: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
-}
 
   Future<void> _saveAndContinue() async {
     if (_extractedData == null) return;
@@ -84,13 +85,12 @@ class _CvUploadScreenState extends State<CvUploadScreen> {
       });
       if (mounted) {
         Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => const JobSearchScreen()));
+            MaterialPageRoute(builder: (_) => const MainShell()));
       }
     } catch (e) {
       setState(() => _error = 'Failed to save profile — please try again.');
     } finally {
       setState(() => _isLoading = false);
-  
     }
   }
 
