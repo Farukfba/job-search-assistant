@@ -24,7 +24,7 @@ Most job search apps stop at listing jobs. JobHero goes further: it acts as an A
 
 | Onboarding | Home | Tracker |
 |---|---|---|
-| ![Onboarding](screenshots/Onboarding.png) | ![Home](screenshots/home.png) | ![Tracker](screenshots/Tracker.png) | ![Job_detais](screenshots/Job_details.png) | ![Cover_letter](screenshots/Cover_letter.png) |
+| ![Onboarding](screenshots/Onboarding.png) | ![Home](screenshots/Home.png) | ![Tracker](screenshots/Tracker.png) | ![Job_detais](screenshots/Job_details.png) | ![Cover_letter](screenshots/Cover_letter.png) |
 
 
 ## Architecture
