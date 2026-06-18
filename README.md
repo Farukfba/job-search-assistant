@@ -2,6 +2,8 @@
 
 An AI-powered job search assistant built with Flutter and the Claude API. JobHero reads your CV, finds live job listings, scores how well you match each role, and generates tailored cover letters and interview prep — all from your phone.
 
+**[Watch the demo](https://youtube.com/shorts/yh8DhrW2YAY?feature=share)**
+
 ## Overview
 
 Most job search apps stop at listing jobs. JobHero goes further: it acts as an AI career agent that understands your actual skills and experience, then uses that understanding to score opportunities, write application materials, and help you prepare — turning a tedious search-and-apply loop into something closer to having a career coach in your pocket.
@@ -17,6 +19,12 @@ Most job search apps stop at listing jobs. JobHero goes further: it acts as an A
 - **Application tracker** — a kanban-style board (Applied → Interview → Offer → Rejected) synced to Supabase
 - **Home dashboard** — a quick-search shortcut and an at-a-glance view of your application pipeline
 - **Profile** — review your parsed CV data at any time
+
+## Screenshots
+
+| Onboarding | Home | Tracker |
+|---|---|---|
+| ![Onboarding](screenshots/Onboarding.png) | ![Home](screenshots/home.png) | ![Tracker](screenshots/Tracker.png) |
 
 ## Architecture
 
@@ -121,10 +129,6 @@ Run the app:
 ```bash
 flutter run
 ```
-
-## Demo
-
-[Add a 60–90 second screen recording or GIF here, showing: CV upload → search → match score → cover letter → tracker]
 
 ## Known limitations
 

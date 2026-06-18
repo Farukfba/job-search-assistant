@@ -30,6 +30,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'JobHero',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       home: const StartupGate(),
     );
