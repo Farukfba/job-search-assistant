@@ -41,12 +41,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
-        await supabase.auth.signInWithPassword(email: email, password: password);
+        final res = await supabase.auth.signInWithPassword(email: email, password: password);
+        debugPrint('Sign-in result: session=${res.session != null}, user=${res.user?.id}');
       } else {
-        await supabase.auth.signUp(email: email, password: password);
+        final res = await supabase.auth.signUp(email: email, password: password);
+        debugPrint('Sign-up result: session=${res.session != null}, user=${res.user?.id}');
       }
+      debugPrint('currentSession after auth call: ${supabase.auth.currentSession != null}');
       // AuthGate listens for the state change and routes from here.
     } catch (e) {
+      debugPrint('Auth error: $e');
       setState(() => _error = 'Couldn\'t sign you in — check your details and try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);

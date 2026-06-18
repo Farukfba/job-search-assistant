@@ -36,10 +36,9 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Decides, once per fresh app install, whether to show onboarding
-/// before handing off to AuthGate. After onboarding is seen once it's
-/// never shown again, even after logout — only AuthGate's session
-/// check matters from then on.
+/// A real splash screen shown the instant the app launches — no white
+/// flash. Decides, once per fresh install, whether to show onboarding
+/// before handing off to AuthGate.
 class StartupGate extends StatefulWidget {
   const StartupGate({super.key});
 
@@ -68,7 +67,7 @@ class _StartupGateState extends State<StartupGate> {
   @override
   Widget build(BuildContext context) {
     if (_onboardingSeen == null) {
-      return const Scaffold(body: SizedBox.shrink());
+      return const _SplashScreen();
     }
     if (_onboardingSeen == false) {
       return const OnboardingScreen();
@@ -77,14 +76,47 @@ class _StartupGateState extends State<StartupGate> {
   }
 }
 
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.paper,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.pineLight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.work_outline_rounded, color: AppColors.pine, size: 34),
+            ),
+            const SizedBox(height: 20),
+            Text('JobHero', style: Theme.of(context).textTheme.headlineMedium),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.pine),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// AuthGate is the single source of truth for top-level navigation
 /// once onboarding is done. It listens to auth state AND profile
 /// existence, and decides whether to show AuthScreen, CvUploadScreen,
 /// or MainShell. No screen should ever Navigator.push its way "out"
-/// of this widget — that's what was breaking logout previously.
-/// Instead, screens call back into AuthGate (via the onProfileSaved
-/// callback) to signal a state change, and AuthGate rebuilds itself
-/// accordingly.
+/// of this widget. Screens call back into AuthGate (via the
+/// onProfileSaved callback) to signal a state change instead.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -95,6 +127,12 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool? _hasProfile;
   String? _checkedForUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('AuthGate initState — currentSession: ${supabase.auth.currentSession != null}');
+  }
 
   Future<void> _checkProfile(String userId) async {
     if (_checkedForUserId == userId && _hasProfile != null) return;
@@ -125,6 +163,8 @@ class _AuthGateState extends State<AuthGate> {
     return StreamBuilder<AuthState>(
       stream: supabase.auth.onAuthStateChange,
       builder: (context, snapshot) {
+        debugPrint(
+            'AuthGate StreamBuilder rebuild — event: ${snapshot.data?.event}, hasSession: ${supabase.auth.currentSession != null}');
         final session = supabase.auth.currentSession;
 
         if (session == null) {

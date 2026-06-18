@@ -107,10 +107,6 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await supabase.auth.signOut();
-  }
-
   List<Job> get _sortedJobs {
     if (!_scoresShown || _sortMode == _SortMode.none) return _jobs;
     final sorted = [..._jobs];
@@ -129,13 +125,6 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Find a role'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, size: 20),
-            tooltip: 'Log out',
-            onPressed: _logout,
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
