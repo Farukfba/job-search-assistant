@@ -11,10 +11,16 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
+  // Disposable demo account for people trying the app / giving feedback.
+  // Safe to be public: RLS scopes it to its own rows only.
+  static const _demoEmail = 'demo@jobhero.app';
+  static const _demoPassword = 'DemoUser2026!';
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLogin = true;
   bool _isLoading = false;
+  bool _isDemoLoading = false;
   bool _obscurePassword = true;
   String? _error;
 
@@ -41,24 +47,39 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
-        final res = await supabase.auth.signInWithPassword(email: email, password: password);
-        debugPrint('Sign-in result: session=${res.session != null}, user=${res.user?.id}');
+        await supabase.auth.signInWithPassword(email: email, password: password);
       } else {
-        final res = await supabase.auth.signUp(email: email, password: password);
-        debugPrint('Sign-up result: session=${res.session != null}, user=${res.user?.id}');
+        await supabase.auth.signUp(email: email, password: password);
       }
-      debugPrint('currentSession after auth call: ${supabase.auth.currentSession != null}');
       // AuthGate listens for the state change and routes from here.
     } catch (e) {
-      debugPrint('Auth error: $e');
       setState(() => _error = 'Couldn\'t sign you in — check your details and try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  Future<void> _demoLogin() async {
+    setState(() {
+      _isDemoLoading = true;
+      _error = null;
+    });
+    try {
+      final res = await supabase.auth.signInWithPassword(
+          email: _demoEmail, password: _demoPassword);
+      debugPrint('Demo login: session=${res.session != null}, user=${res.user?.id}');
+    } catch (e) {
+      debugPrint('Demo login error: $e');
+      setState(() => _error = 'Demo error: $e');
+    } finally {
+      if (mounted) setState(() => _isDemoLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final busy = _isLoading || _isDemoLoading;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -135,7 +156,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                 FilledButton(
-                  onPressed: _isLoading ? null : _submit,
+                  onPressed: busy ? null : _submit,
                   child: _isLoading
                       ? const SizedBox(
                           height: 20, width: 20,
@@ -146,14 +167,45 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton(
-                    onPressed: () => setState(() {
-                      _isLogin = !_isLogin;
-                      _error = null;
-                    }),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() {
+                              _isLogin = !_isLogin;
+                              _error = null;
+                            }),
                     child: Text(
                       _isLogin ? "Don't have an account? Sign up" : 'Already have an account? Log in',
                       style: const TextStyle(color: AppColors.stone, fontSize: 13),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: AppColors.sand)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('or',
+                          style: const TextStyle(color: AppColors.stone, fontSize: 12)),
+                    ),
+                    const Expanded(child: Divider(color: AppColors.sand)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : _demoLogin,
+                  icon: _isDemoLoading
+                      ? const SizedBox(
+                          height: 18, width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.play_circle_outline_rounded, size: 20),
+                  label: Text(_isDemoLoading ? 'Starting demo...' : 'Try the demo'),
+                ),
+                const SizedBox(height: 6),
+                Center(
+                  child: Text(
+                    'No sign-up needed — explore with sample data',
+                    style: const TextStyle(color: AppColors.stone, fontSize: 11),
                   ),
                 ),
               ],

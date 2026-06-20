@@ -192,10 +192,9 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
   Widget _buildToolbar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-      child: Row(
-        children: [
-          if (!_scoresShown)
-            Expanded(
+      child: !_scoresShown
+          ? SizedBox(
+              width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: _isScoring ? null : _showMatchScores,
                 icon: _isScoring
@@ -206,28 +205,23 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
                 label: Text(_isScoring ? 'Scoring ${_jobs.length} jobs...' : 'Show match scores'),
               ),
             )
-          else
-            Expanded(
-              child: Row(
-                children: [
-                  Text('Sort: ', style: Theme.of(context).textTheme.bodyMedium),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: SegmentedButton<_SortMode>(
-                      segments: const [
-                        ButtonSegment(value: _SortMode.bestMatch, label: Text('Best match')),
-                        ButtonSegment(value: _SortMode.lowestMatch, label: Text('Lowest match')),
-                      ],
-                      selected: {_sortMode == _SortMode.none ? _SortMode.bestMatch : _sortMode},
-                      onSelectionChanged: (s) => setState(() => _sortMode = s.first),
-                      style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                    ),
-                  ),
-                ],
-              ),
+          : Row(
+              children: [
+                const Icon(Icons.swap_vert_rounded, size: 18, color: AppColors.stone),
+                const SizedBox(width: 8),
+                _SortToggle(
+                  label: 'Best match',
+                  selected: _sortMode == _SortMode.bestMatch || _sortMode == _SortMode.none,
+                  onTap: () => setState(() => _sortMode = _SortMode.bestMatch),
+                ),
+                const SizedBox(width: 8),
+                _SortToggle(
+                  label: 'Lowest match',
+                  selected: _sortMode == _SortMode.lowestMatch,
+                  onTap: () => setState(() => _sortMode = _SortMode.lowestMatch),
+                ),
+              ],
             ),
-        ],
-      ),
     );
   }
 
@@ -268,6 +262,38 @@ class _JobSearchScreenState extends State<JobSearchScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _SortToggle extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SortToggle({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.pine : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.pine : AppColors.sand),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: selected ? Colors.white : AppColors.stone,
+          ),
+        ),
+      ),
     );
   }
 }
