@@ -316,7 +316,7 @@ class _JobListCard extends StatelessWidget {
                 fontWeight: FontWeight.w700, color: scoreColor)),
           ),
           const SizedBox(height: 8),
-          Icon(Icons.favorite_border_rounded, size: 18, color: AppColors.muted),
+          // Icon(Icons.favorite_border_rounded, size: 18, color: AppColors.muted),
         ]),
       ]),
     );
