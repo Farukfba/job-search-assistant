@@ -1,261 +1,266 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import 'main_shell.dart';
 
 class TrackerScreen extends StatefulWidget {
   const TrackerScreen({super.key});
-
   @override
   State<TrackerScreen> createState() => TrackerScreenState();
 }
 
 class TrackerScreenState extends State<TrackerScreen> {
-  static const _stages = ['Applied', 'Interview', 'Offer', 'Rejected'];
-
+  static const _stages = ['Interview', 'Applied', 'Offer', 'Rejected'];
   bool _isLoading = true;
-  String? _error;
   List<Map<String, dynamic>> _jobs = [];
+  String _activeFilter = 'Interview';
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  void initState() { super.initState(); _load(); }
 
   Future<void> reload() => _load();
 
   Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() => _isLoading = true);
     try {
       final jobs = await ApiService.getSavedJobs();
       setState(() => _jobs = jobs);
-    } catch (e) {
-      setState(() => _error = 'Couldn\'t load your tracker — please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) {}
+    finally { if (mounted) setState(() => _isLoading = false); }
   }
 
   Future<void> _updateStatus(Map<String, dynamic> job, String newStatus) async {
     try {
       await ApiService.updateJobStatus(job['id'], newStatus);
       setState(() => job['status'] = newStatus);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Couldn\'t update status — please try again.')),
-        );
-      }
-    }
+    } catch (_) {}
   }
 
   Color _stageColor(String stage) {
     switch (stage) {
-      case 'Interview':
-        return const Color(0xFF2563A8);
-      case 'Offer':
-        return AppColors.pine;
-      case 'Rejected':
-        return AppColors.danger;
-      default:
-        return AppColors.stone;
+      case 'Interview': return AppColors.interview;
+      case 'Applied': return AppColors.applied;
+      case 'Offer': return AppColors.offer;
+      case 'Rejected': return AppColors.rejected;
+      default: return AppColors.muted;
     }
   }
 
+  Color _scoreColor(int score) {
+    if (score >= 75) return AppColors.scoreHigh;
+    if (score >= 50) return AppColors.scoreMid;
+    return AppColors.scoreLow;
+  }
+
+  Color _avatarColor(String company) {
+    final colors = [0xFF6366F1, 0xFF1C1C1C, 0xFF16A34A, 0xFFDC2626, 0xFFF59E0B, 0xFF9333EA];
+    return Color(colors[company.hashCode % colors.length]);
+  }
+
+  int _countForStage(String stage) =>
+      _jobs.where((j) => (j['status'] ?? 'Applied') == stage).length;
+
   @override
   Widget build(BuildContext context) {
+    final sans = GoogleFonts.inter().fontFamily!;
+    final total = _jobs.length;
+    final stageJobs = _jobs.where((j) => (j['status'] ?? 'Applied') == _activeFilter).toList();
+
+    if (_isLoading) {
+      return const Scaffold(backgroundColor: AppColors.white,
+          body: Center(child: CircularProgressIndicator(color: AppColors.green)));
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Tracker')),
+      backgroundColor: AppColors.white,
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.pine,
+          color: AppColors.green,
           onRefresh: _load,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.pine))
-              : _error != null
-                  ? _ErrorState(message: _error!, onRetry: _load)
-                  : _jobs.isEmpty
-                      ? _EmptyTracker()
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          children: _stages.expand((stage) {
-                            final stageJobs =
-                                _jobs.where((j) => (j['status'] ?? 'Applied') == stage).toList();
-                            if (stageJobs.isEmpty) return <Widget>[];
-                            return [
-                              _StageHeader(
-                                stage: stage,
-                                count: stageJobs.length,
-                                color: _stageColor(stage),
-                              ),
-                              ...stageJobs.map((job) => _TrackerCard(
-                                    job: job,
-                                    stage: stage,
-                                    stages: _stages,
-                                    color: _stageColor(stage),
-                                    onUpdateStatus: _updateStatus,
-                                  )),
-                              const SizedBox(height: 8),
-                            ];
-                          }).toList(),
-                        ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StageHeader extends StatelessWidget {
-  final String stage;
-  final int count;
-  final Color color;
-
-  const _StageHeader({required this.stage, required this.count, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 16, 4, 10),
-      child: Row(
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 8),
-          Text(
-            stage,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: AppColors.ink,
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$count',
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
-              color: AppColors.stone,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrackerCard extends StatelessWidget {
-  final Map<String, dynamic> job;
-  final String stage;
-  final List<String> stages;
-  final Color color;
-  final void Function(Map<String, dynamic> job, String newStatus) onUpdateStatus;
-
-  const _TrackerCard({
-    required this.job,
-    required this.stage,
-    required this.stages,
-    required this.color,
-    required this.onUpdateStatus,
-  });
-
-  Color _scoreColor(int score) {
-    if (score >= 75) return AppColors.pine;
-    if (score >= 50) return AppColors.ember;
-    return AppColors.danger;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isRejected = stage == 'Rejected';
-    final isOffer = stage == 'Offer';
-    final currentIndex = stages.indexOf(stage);
-    final matchScore = (job['match_score'] as num?)?.toInt();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.sand),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: _jobs.isEmpty ? _emptyState(sans) : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: 4, color: color),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              job['job_title'] ?? '',
-                              style: const TextStyle(
-                                  fontFamily: 'Inter', fontWeight: FontWeight.w600, fontSize: 14, height: 1.2),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              job['company'] ?? '',
-                              style: const TextStyle(
-                                  fontFamily: 'Inter', fontSize: 12.5, color: AppColors.stone),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (matchScore != null) ...[
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _scoreColor(matchScore).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$matchScore%',
-                            style: TextStyle(
-                                fontFamily: 'Inter',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: _scoreColor(matchScore)),
-                          ),
-                        ),
-                      ],
-                      if (!isRejected && !isOffer)
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded, color: AppColors.stone, size: 18),
-                          padding: EdgeInsets.zero,
-                          onSelected: (value) => onUpdateStatus(job, value),
-                          itemBuilder: (context) => [
-                            if (currentIndex < stages.length - 2)
-                              PopupMenuItem(
-                                value: stages[currentIndex + 1],
-                                child: Text('Move to ${stages[currentIndex + 1]}'),
-                              ),
-                            const PopupMenuItem(value: 'Rejected', child: Text('Mark as rejected')),
-                          ],
-                        )
-                      else
-                        const SizedBox(width: 8),
-                    ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                child: Row(children: [
+                  Text('Tracker', style: TextStyle(fontFamily: sans, fontSize: 28,
+                      fontWeight: FontWeight.w800, color: AppColors.ink)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => MainShell.of(context)?.goToTab(1),
+                    child: Container(
+                      width: 36, height: 36,
+                      decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle),
+                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                    ),
                   ),
+                ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Text('$total application${total != 1 ? 's' : ''}',
+                    style: TextStyle(fontFamily: sans, fontSize: 14, color: AppColors.muted)),
+              ),
+
+              // Stage filter tabs
+              SizedBox(
+                height: 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: _stages.map((stage) {
+                    final count = _countForStage(stage);
+                    final active = stage == _activeFilter;
+                    final color = _stageColor(stage);
+                    return GestureDetector(
+                      onTap: () => setState(() => _activeFilter = stage),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: active ? color.withValues(alpha: 0.12) : AppColors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: active ? color : AppColors.border,
+                            width: active ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(children: [
+                          Container(width: 7, height: 7,
+                              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Text(stage, style: TextStyle(fontFamily: sans, fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: active ? color : AppColors.muted)),
+                          const SizedBox(width: 6),
+                          Text('$count', style: TextStyle(fontFamily: sans, fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: active ? color : AppColors.muted)),
+                        ]),
+                      ),
+                    );
+                  }).toList(),
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Section header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(children: [
+                  Text(_activeFilter.toUpperCase(), style: TextStyle(fontFamily: sans,
+                      fontSize: 11, fontWeight: FontWeight.w600,
+                      color: AppColors.muted, letterSpacing: 0.5)),
+                  Text(' · ${stageJobs.length}', style: TextStyle(fontFamily: sans,
+                      fontSize: 11, color: AppColors.muted)),
+                  const Spacer(),
+                  Row(children: [
+                    const Icon(Icons.swap_vert_rounded, size: 14, color: AppColors.muted),
+                    const SizedBox(width: 4),
+                    Text('Sort', style: TextStyle(fontFamily: sans, fontSize: 12,
+                        color: AppColors.muted)),
+                  ]),
+                ]),
+              ),
+              const SizedBox(height: 10),
+
+              Expanded(
+                child: stageJobs.isEmpty
+                    ? Center(child: Text('No ${_activeFilter.toLowerCase()} applications',
+                        style: TextStyle(fontFamily: sans, fontSize: 14, color: AppColors.muted)))
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        itemCount: stageJobs.length,
+                        itemBuilder: (context, i) {
+                          final job = stageJobs[i];
+                          final company = job['company'] ?? '';
+                          final score = (job['match_score'] as num?)?.toInt() ?? 0;
+                          final stageColor = _stageColor(_activeFilter);
+                          final date = job['created_at'] != null
+                              ? _formatDate(DateTime.tryParse(job['created_at']) ?? DateTime.now())
+                              : '';
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(14),
+                              child: IntrinsicHeight(
+                                child: Row(children: [
+                                  Container(width: 4, color: stageColor),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 14),
+                                      child: Row(children: [
+                                        Container(
+                                          width: 44, height: 44,
+                                          decoration: BoxDecoration(
+                                            color: _avatarColor(company),
+                                            borderRadius: BorderRadius.circular(12)),
+                                          child: Center(child: Text(
+                                            company.isNotEmpty ? company[0].toUpperCase() : '?',
+                                            style: const TextStyle(fontFamily: 'Inter',
+                                                fontSize: 16, fontWeight: FontWeight.w700,
+                                                color: Colors.white))),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                          Text(job['job_title'] ?? '', style: TextStyle(
+                                              fontFamily: sans, fontSize: 15,
+                                              fontWeight: FontWeight.w700, color: AppColors.ink),
+                                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          Text('$company · $date', style: TextStyle(
+                                              fontFamily: sans, fontSize: 13,
+                                              color: AppColors.muted)),
+                                        ])),
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                                color: _scoreColor(score), width: 1.5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text('$score', style: TextStyle(
+                                              fontFamily: sans, fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: _scoreColor(score))),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        PopupMenuButton<String>(
+                                          icon: const Icon(Icons.more_horiz_rounded,
+                                              color: AppColors.muted, size: 20),
+                                          onSelected: (v) => _updateStatus(job, v),
+                                          itemBuilder: (_) {
+                                            final current = job['status'] ?? 'Applied';
+                                            final currentIdx = _stages.indexOf(current);
+                                            return [
+                                              if (currentIdx < _stages.length - 1)
+                                                PopupMenuItem(value: _stages[currentIdx + 1],
+                                                    child: Text('Move to ${_stages[currentIdx + 1]}')),
+                                              if (current != 'Rejected')
+                                                const PopupMenuItem(value: 'Rejected',
+                                                    child: Text('Mark as rejected')),
+                                            ];
+                                          },
+                                        ),
+                                      ]),
+                                    ),
+                                  ),
+                                ]),
+                              ),
+                            ),
+                          );
+                        }),
               ),
             ],
           ),
@@ -263,61 +268,49 @@ class _TrackerCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _EmptyTracker extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.sand,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.dashboard_outlined, size: 30, color: AppColors.stone),
-            ),
-            const SizedBox(height: 16),
-            Text('No saved jobs yet', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 6),
-            const Text(
-              'Save a job from its detail screen to start tracking your applications here.',
-              style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppColors.stone),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+  String _formatDate(DateTime dt) {
+    final months = ['Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[dt.month - 1]} ${dt.day}';
   }
-}
 
-class _ErrorState extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _ErrorState({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center,
-                style: const TextStyle(fontFamily: 'Inter', fontSize: 14)),
-            const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
+  Widget _emptyState(String sans) {
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: SafeArea(child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          child: Row(children: [
+            Text('Tracker', style: TextStyle(fontFamily: sans, fontSize: 28,
+                fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => MainShell.of(context)?.goToTab(1),
+              child: Container(
+                width: 36, height: 36,
+                decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle),
+                child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ]),
         ),
-      ),
+        Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.bar_chart_rounded, size: 40, color: AppColors.muted),
+          const SizedBox(height: 12),
+          Text('No applications yet', style: TextStyle(fontFamily: sans,
+              fontSize: 15, color: AppColors.muted)),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: FilledButton(
+              onPressed: () => MainShell.of(context)?.goToTab(1),
+              child: Text('Track your first application',
+                  style: TextStyle(fontFamily: sans, fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ]))),
+      ])),
     );
   }
 }

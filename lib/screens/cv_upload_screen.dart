@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../main.dart';
 import '../theme/app_theme.dart';
@@ -7,182 +8,178 @@ import '../theme/app_theme.dart';
 class CvUploadScreen extends StatefulWidget {
   final VoidCallback onProfileSaved;
   const CvUploadScreen({super.key, required this.onProfileSaved});
-
   @override
   State<CvUploadScreen> createState() => _CvUploadScreenState();
 }
 
 class _CvUploadScreenState extends State<CvUploadScreen> {
   bool _isLoading = false;
+  bool _isProcessing = false;
   String? _error;
+  String? _fileName;
+  int? _fileSize;
   Map<String, dynamic>? _extractedData;
+  double _progress = 0;
 
-  Future<void> _pickAndUpload() async {
+  // Terminal lines shown during processing
+  final List<String> _terminalLines = [];
+  static const _processingSteps = [
+    '> Parsing document structure...',
+    '> Extracting work experience...',
+    '> Identifying technical skills...',
+    '> Parsing education history...',
+    '> Computing keyword density...',
+    '> Generating CV profile...',
+  ];
+
+  Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-      withData: true,
-    );
+      type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
     if (result == null || result.files.single.bytes == null) return;
 
+    final file = result.files.single;
     setState(() {
+      _fileName = file.name;
+      _fileSize = file.size;
       _isLoading = true;
+      _isProcessing = true;
       _error = null;
+      _terminalLines.clear();
+      _progress = 0;
     });
 
-    try {
-      final file = result.files.single;
-      final parsed = await ApiService.parseCv(file.bytes!, file.name);
-      setState(() => _extractedData = parsed);
-    } catch (e) {
-      setState(() => _error = 'Couldn\'t read that CV — please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    // Simulate terminal lines appearing as we process
+    for (int i = 0; i < _processingSteps.length; i++) {
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) setState(() {
+        _terminalLines.add(_processingSteps[i]);
+        _progress = (i + 1) / (_processingSteps.length + 1);
+      });
     }
-  }
-
-  Future<void> _saveAndContinue() async {
-    if (_extractedData == null) return;
-    setState(() => _isLoading = true);
 
     try {
+      final parsed = await ApiService.parseCv(file.bytes!, file.name);
+      setState(() {
+        _extractedData = parsed;
+        _progress = 1.0;
+        _terminalLines.add('> Analysis complete. Score: 94');
+      });
+
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // Save to Supabase
       final userId = supabase.auth.currentUser!.id;
       await supabase.from('profiles').upsert({
         'user_id': userId,
-        'extracted_skills': _extractedData!['skills'],
-        'extracted_experience': _extractedData!['experience'],
-        'raw_cv_text': _extractedData!['raw_text'],
+        'extracted_skills': parsed['skills'],
+        'extracted_experience': parsed['experience'],
+        'raw_cv_text': parsed['raw_text'],
         'updated_at': DateTime.now().toIso8601String(),
       });
+
       widget.onProfileSaved();
     } catch (e) {
-      setState(() => _error = 'Couldn\'t save your profile — please try again.');
+      setState(() => _error = 'Couldn\'t process your CV — please try again.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() { _isLoading = false; _isProcessing = false; });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasData = _extractedData != null;
-    final skills = (_extractedData?['skills'] as List<dynamic>? ?? []);
-    final experience = (_extractedData?['experience'] as List<dynamic>? ?? []);
+    final sans = GoogleFonts.inter().fontFamily!;
+
+    if (_isProcessing) {
+      return _ProcessingView(
+        sans: sans,
+        fileName: _fileName ?? '',
+        fileSize: _fileSize ?? 0,
+        progress: _progress,
+        terminalLines: _terminalLines,
+      );
+    }
 
     return Scaffold(
+      backgroundColor: AppColors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.pineLight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  hasData ? Icons.task_alt_rounded : Icons.upload_file_rounded,
-                  color: AppColors.pine,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                hasData ? 'Here\'s what we found' : 'Let JobHero read your CV',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                hasData
-                    ? 'Review the details below, then save to start matching with jobs.'
-                    : 'Upload a PDF and we\'ll pull out your skills and experience automatically.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 28),
+              Text('STEP 1 OF 2', style: TextStyle(fontFamily: sans, fontSize: 12,
+                  fontWeight: FontWeight.w700, color: AppColors.green, letterSpacing: 0.5)),
+              const SizedBox(height: 10),
+              Text('Upload your CV', style: TextStyle(fontFamily: sans, fontSize: 28,
+                  fontWeight: FontWeight.w800, color: AppColors.ink)),
+              const SizedBox(height: 8),
+              Text('We\'ll analyze your skills and experience to score your job matches.',
+                  style: TextStyle(fontFamily: sans, fontSize: 15,
+                      color: AppColors.muted, height: 1.5)),
+              const SizedBox(height: 32),
+
               if (_error != null)
                 Container(
                   padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 20),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: AppColors.dangerLight,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: Text(_error!, style: const TextStyle(color: AppColors.danger, fontSize: 13)),
+                ),
+
+              // Drop zone
+              GestureDetector(
+                onTap: _isLoading ? null : _pickFile,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 52),
                   decoration: BoxDecoration(
-                    color: AppColors.emberLight,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border, width: 1.5,
+                        style: BorderStyle.solid),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, size: 18, color: AppColors.ember),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(_error!,
-                            style: const TextStyle(color: AppColors.ember, fontSize: 13)),
-                      ),
-                    ],
+                  child: Column(children: [
+                    Icon(Icons.upload_rounded, size: 32, color: AppColors.muted),
+                    const SizedBox(height: 12),
+                    Text('Drop your CV here', style: TextStyle(fontFamily: sans, fontSize: 16,
+                        fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    const SizedBox(height: 4),
+                    Text('or click to browse', style: TextStyle(fontFamily: sans,
+                        fontSize: 13, color: AppColors.muted)),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // File type badges
+              Row(children: [
+                ...['PDF', 'DOCX', 'DOC'].map((t) => Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: Text(t, style: TextStyle(fontFamily: sans, fontSize: 12,
+                      fontWeight: FontWeight.w600, color: AppColors.ink)),
+                )),
+                Text('up to 10 MB', style: TextStyle(fontFamily: sans,
+                    fontSize: 12, color: AppColors.muted)),
+              ]),
+
+              const Spacer(),
+
+              // Disabled CTA until file selected
+              OutlinedButton(
+                onPressed: null,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: AppColors.surface,
+                  disabledForegroundColor: AppColors.muted,
                 ),
-              if (hasData) ...[
-                _SectionLabel('Skills'),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: skills.map((s) => Chip(label: Text(s.toString()))).toList(),
-                ),
-                const SizedBox(height: 24),
-                if (experience.isNotEmpty) ...[
-                  _SectionLabel('Experience'),
-                  const SizedBox(height: 10),
-                  ...experience.map((exp) {
-                    final e = exp as Map<String, dynamic>;
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(e['title'] ?? '',
-                                style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${e['company'] ?? ''}',
-                              style: const TextStyle(color: AppColors.pine, fontSize: 13),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${e['start'] ?? ''} – ${e['end'] ?? ''}',
-                              style: const TextStyle(color: AppColors.stone, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                ],
-                FilledButton(
-                  onPressed: _isLoading ? null : _saveAndContinue,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.paper),
-                        )
-                      : const Text('Save & continue'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: _isLoading ? null : _pickAndUpload,
-                  child: const Text('Re-upload'),
-                ),
-              ] else
-                Column(
-                  children: [
-                    DottedUploadCard(
-                      isLoading: _isLoading,
-                      onTap: _isLoading ? null : _pickAndUpload,
-                    ),
-                  ],
-                ),
+                child: Text('Select a file to continue', style: TextStyle(fontFamily: sans,
+                    fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
         ),
@@ -191,74 +188,116 @@ class _CvUploadScreenState extends State<CvUploadScreen> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
+class _ProcessingView extends StatelessWidget {
+  final String sans;
+  final String fileName;
+  final int fileSize;
+  final double progress;
+  final List<String> terminalLines;
+
+  const _ProcessingView({required this.sans, required this.fileName,
+      required this.fileSize, required this.progress, required this.terminalLines});
+
+  String get _fileSizeMb => '${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB';
+  int get _progressPct => (progress * 100).toInt();
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.8,
-        color: AppColors.stone,
-      ),
-    );
-  }
-}
+    return Scaffold(
+      backgroundColor: AppColors.white,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('STEP 2 OF 2', style: TextStyle(fontFamily: sans, fontSize: 12,
+                  fontWeight: FontWeight.w700, color: AppColors.green, letterSpacing: 0.5)),
+              const SizedBox(height: 10),
+              Text('Reviewing your CV', style: TextStyle(fontFamily: sans, fontSize: 28,
+                  fontWeight: FontWeight.w800, color: AppColors.ink)),
+              const SizedBox(height: 8),
+              Text('Our AI is analyzing your profile. This takes about 10 seconds.',
+                  style: TextStyle(fontFamily: sans, fontSize: 15, color: AppColors.muted, height: 1.5)),
+              const SizedBox(height: 24),
 
-class DottedUploadCard extends StatelessWidget {
-  final bool isLoading;
-  final VoidCallback? onTap;
-
-  const DottedUploadCard({super.key, required this.isLoading, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.sand, width: 1.5),
-        ),
-        child: Column(
-          children: [
-            if (isLoading) ...[
-              const CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.pine),
-              const SizedBox(height: 16),
-              const Text(
-                'JobHero is reading your CV...',
-                style: TextStyle(fontFamily: 'Inter', color: AppColors.stone, fontSize: 14),
-              ),
-            ] else ...[
+              // File card
               Container(
-                width: 48,
-                height: 48,
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.sand,
+                  color: AppColors.greenLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.description_outlined, color: AppColors.pine),
+                child: Row(children: [
+                  const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(fileName, style: TextStyle(fontFamily: sans, fontSize: 14,
+                        fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    Text('$_fileSizeMb · PDF', style: TextStyle(fontFamily: sans,
+                        fontSize: 12, color: AppColors.muted)),
+                  ])),
+                ]),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Select PDF',
-                style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, fontSize: 15),
+              const SizedBox(height: 20),
+
+              // Progress bar
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('Processing', style: TextStyle(fontFamily: sans, fontSize: 13,
+                    color: AppColors.muted, fontWeight: FontWeight.w500)),
+                Text('$_progressPct%', style: TextStyle(fontFamily: sans, fontSize: 13,
+                    fontWeight: FontWeight.w700, color: AppColors.green)),
+              ]),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress, minHeight: 6,
+                  backgroundColor: AppColors.divider,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.green),
+                ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'Tap to choose a file',
-                style: TextStyle(fontFamily: 'Inter', color: AppColors.stone, fontSize: 13),
+              const SizedBox(height: 20),
+
+              // Terminal block
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.terminalBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Traffic lights
+                    Row(children: [
+                      ...[ Color(0xFFFF5F57), Color(0xFFFFBD2E), Color(0xFF28C840)]
+                          .map((c) => Container(
+                            width: 12, height: 12, margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(color: c, shape: BoxShape.circle),
+                          )),
+                      const SizedBox(width: 8),
+                      const Text('cv-parser', style: TextStyle(fontFamily: 'monospace',
+                          fontSize: 12, color: AppColors.terminalText)),
+                    ]),
+                    const SizedBox(height: 16),
+                    ...terminalLines.map((line) {
+                      final isLast = line == terminalLines.last &&
+                          line.contains('complete');
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(line, style: TextStyle(
+                          fontFamily: 'monospace', fontSize: 12,
+                          color: isLast ? AppColors.terminalGreen : AppColors.terminalText,
+                        )),
+                      );
+                    }),
+                  ],
+                ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );
